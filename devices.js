@@ -8017,6 +8017,31 @@ const devices = [
             await bind(endpoint, coordinatorEndpoint, ['genIdentify', 'genOnOff', 'genBinaryInput']);
         },
     },
+    {
+        zigbeeModel: ['DIM0-10V2CH'],
+        model: 'DIM0-10V2CH',
+        vendor: 'AF',
+        description: 'Dual Channel 0-10V Dimmer',
+        fromZigbee: [fz.generic_onoff_composite, fz.generic_brightness_composite, fz.ignore_basic_report],
+        toZigbee: [tz.light_onoff_brightness_composite, tz.ignore_transition, tz.light_alert, tz.light_brightness_move],
+        endpoint: (device) => {
+            return {'l1': 1, 'l2': 2, 'l3': 3};
+        },
+        meta: {configureKey: 1},
+        configure: async (device, coordinatorEndpoint) => {
+            const endpoint1 = device.getEndpoint(1);
+            const endpoint2 = device.getEndpoint(2);
+            const endpoint3 = device.getEndpoint(3);
+            await bind(endpoint1, coordinatorEndpoint, ['genOnOff', 'genLevelCtrl']);
+            await configureReporting.onOff(endpoint1);
+            await configureReporting.brightness(endpoint1);
+            await bind(endpoint2, coordinatorEndpoint, ['genOnOff', 'genLevelCtrl']);
+            await configureReporting.onOff(endpoint2);
+            await configureReporting.brightness(endpoint2);
+            await bind(endpoint3, coordinatorEndpoint, ['genOnOff']);
+            await configureReporting.onOff(endpoint3);
+        },
+    },
 
     // Linkind
     {

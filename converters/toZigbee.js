@@ -1630,6 +1630,84 @@ const converters = {
             await entity.write('genBasic', {0x4005: {value, type: 0x20}}, options.tint);
         },
     },
+    on_off_composite: {
+        key: ['state'],
+        convertSet: async (entity, key, value, meta) => {
+            await entity.command('genOnOff', value.toLowerCase(), {}, getOptions(meta));
+            if (value.toLowerCase() === 'toggle') {
+                if (!meta.state.hasOwnProperty('state')) {
+                    return {};
+                } else {
+                    const payload = {}
+                    payload[meta.endpoint_name] = {state: meta.state.state === 'OFF' ? 'ON' : 'OFF'};
+                    return {state: payload};
+                }
+            } else {
+                const payload = {}
+                payload[meta.endpoint_name] = {state: value.toUpperCase()};
+                return {state: payload};
+            }
+        },
+        convertGet: async (entity, key, meta) => {
+            await entity.read('genOnOff', ['onOff']);
+        },
+    },
+    light_onoff_brightness_composite: {
+        key: ['state', 'brightness', 'brightness_percent'],
+        convertSet: async (entity, key, value, meta) => {
+            const {message} = meta;
+            const hasBrightness = message.hasOwnProperty('brightness') || message.hasOwnProperty('brightness_percent');
+            const brightnessValue = message.hasOwnProperty('brightness') ?
+                message.brightness : message.brightness_percent;
+            const hasState = message.hasOwnProperty('state');
+            const state = hasState ? message.state.toLowerCase() : null;
+
+            if (state === 'toggle' || state === 'off' || (!hasBrightness && state === 'on')) {
+                const result = await converters.on_off_composite.convertSet(entity, 'state', state, meta);
+                if (state === 'on') {
+                    result.readAfterWriteTime = 0;
+                }
+                return result;
+            } else if (!hasState && hasBrightness && Number(brightnessValue) === 0) {
+                return await converters.on_off_composite.convertSet(entity, 'state', 'off', meta);
+            } else {
+                const transition = getTransition(entity, 'brightness', meta);
+                let brightness = 0;
+
+                if (message.hasOwnProperty('brightness')) {
+                    brightness = message.brightness;
+                } else if (message.hasOwnProperty('brightness_percent')) {
+                    brightness = Math.round(Number(message.brightness_percent) * 2.55).toString();
+                }
+
+                await entity.command(
+                    'genLevelCtrl',
+                    'moveToLevelWithOnOff',
+                    {level: Number(brightness), transtime: transition},
+                    getOptions(meta)
+                );
+                const payload = {};
+                payload[meta.endpoint_name] = {state: brightness === 0 ? 'OFF' : 'ON', brightness: Number(brightness)}
+                return {
+                    state: payload,
+                    readAfterWriteTime: transition * 100,
+                };
+            }
+        },
+        convertGet: async (entity, key, meta) => {
+            if (meta.message) {
+                if (meta.message.hasOwnProperty('brightness')) {
+                    await entity.read('genLevelCtrl', ['currentLevel']);
+                }
+                if (meta.message.hasOwnProperty('state')) {
+                    await converters.on_off_composite.convertGet(entity, key, meta);
+                }
+            } else {
+                await converters.on_off_composite.convertGet(entity, key, meta);
+                await entity.read('genLevelCtrl', ['currentLevel']);
+            }
+        },
+    },
 
     // legrand custom cluster : settings
     legrand_identify: {

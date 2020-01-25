@@ -3979,6 +3979,30 @@ const converters = {
             }
         },
     },
+    generic_onoff_composite: {
+        cluster: 'genOnOff',
+        type: ['attributeReport', 'readResponse'],
+        convert: (model, msg, publish, options, meta) => {
+            const key = getKey(model.endpoint(msg.device), msg.endpoint.ID);
+            if (msg.data.hasOwnProperty('onOff')) {
+                const payload = {};
+                payload[key] = {state: msg.data['onOff'] === 1 ? 'ON' : 'OFF'};
+                return payload;
+            }
+        },
+    },
+    generic_brightness_composite: {
+        cluster: 'genLevelCtrl',
+        type: ['attributeReport', 'readResponse'],
+        convert: (model, msg, publish, options, meta) => {
+            const key = getKey(model.endpoint(msg.device), msg.endpoint.ID);
+            if (msg.data.hasOwnProperty('currentLevel')) {
+                const payload = {};
+                payload[key] = {brightness: msg.data['currentLevel']};
+                return payload;
+            }
+        },
+    },
     tuya_switch: {
         cluster: 'manuSpecificTuyaDimmer',
         type: 'raw',
